@@ -6,6 +6,7 @@ import 'package:pos_umkm/features/checkout/presentation/bloc/checkout_bloc.dart'
 import 'package:pos_umkm/features/checkout/presentation/widgets/checkout_dialog.dart';
 import 'package:pos_umkm/features/checkout/presentation/widgets/digital_receipt_dialog.dart';
 import 'package:pos_umkm/features/history_and_reports/data/services/excel_export_service.dart';
+import 'package:pos_umkm/features/history_and_reports/presentation/widgets/order_history_dialog.dart';
 import 'package:pos_umkm/features/pos/presentation/bloc/cart/cart_bloc.dart';
 import 'package:pos_umkm/features/pos/presentation/bloc/cart/cart_event.dart';
 import 'package:pos_umkm/features/pos/presentation/bloc/cart/cart_state.dart';
@@ -14,6 +15,9 @@ import 'package:pos_umkm/features/pos/presentation/bloc/catalog/catalog_event.da
 import 'package:pos_umkm/features/pos/presentation/bloc/catalog/catalog_state.dart';
 import 'package:pos_umkm/features/pos/presentation/widgets/cart_panel.dart';
 import 'package:pos_umkm/features/pos/presentation/widgets/product_card.dart';
+import 'package:pos_umkm/features/settings/presentation/bloc/settings_cubit.dart';
+import 'package:pos_umkm/features/settings/presentation/screens/store_and_menu_settings_screen.dart';
+import 'package:pos_umkm/features/settings/presentation/widgets/owner_pin_dialog.dart';
 import 'package:pos_umkm/features/shift/presentation/widgets/close_shift_dialog.dart';
 
 class PosScreen extends StatefulWidget {
@@ -61,6 +65,29 @@ class _PosScreenState extends State<PosScreen> {
     );
   }
 
+  void _openHistoryModal(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => const OrderHistoryDialog(),
+    );
+  }
+
+  Future<void> _openOwnerSettings(BuildContext context) async {
+    final authorized = await OwnerPinDialog.verify(
+      context,
+      title: 'Akses Owner: Kelola Menu & Toko',
+      subtitle: 'Masukkan PIN Owner untuk mengubah harga menu atau pengaturan toko (Default: 123456).',
+    );
+    if (!authorized || !context.mounted) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const StoreAndMenuSettingsScreen(),
+      ),
+    );
+  }
+
   Future<void> _exportExcel(BuildContext context) async {
     try {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -81,6 +108,8 @@ class _PosScreenState extends State<PosScreen> {
     return BlocListener<CheckoutBloc, CheckoutState>(
       listener: (context, state) {
         if (state is CheckoutSuccess) {
+          // Kosongkan keranjang belanja setelah lunas
+          context.read<CartBloc>().add(const ClearCartEvent());
           // Tampilkan modal struk digital begitu transaksi berhasil
           showDialog(
             context: context,
@@ -98,27 +127,53 @@ class _PosScreenState extends State<PosScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.point_of_sale, color: Colors.white, size: 20),
-              ),
-              const SizedBox(width: 10),
-              const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          title: BlocBuilder<SettingsCubit, SettingsState>(
+            builder: (context, settingsState) {
+              return Row(
                 children: [
-                  Text('POS UMKM', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  Text('Offline-First Gerai F&B', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.point_of_sale, color: Colors.white, size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          settingsState.settings.storeName,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          settingsState.settings.address,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
-              ),
-            ],
+              );
+            },
           ),
           actions: [
+            // Tombol Riwayat Transaksi, Void, & Kas Kecil
+            IconButton(
+              tooltip: 'Riwayat Transaksi, Void, & Kas Laci',
+              icon: const Icon(Icons.history, color: AppColors.primary),
+              onPressed: () => _openHistoryModal(context),
+            ),
+            // Tombol Kelola Menu & Pengaturan Toko (PIN Owner)
+            IconButton(
+              tooltip: 'Kelola Menu, Harga, & Pengaturan Toko (Owner)',
+              icon: const Icon(Icons.settings_outlined, color: AppColors.primary),
+              onPressed: () => _openOwnerSettings(context),
+            ),
             // Tombol Ekspor Excel
             IconButton(
               tooltip: 'Ekspor Excel Bulanan (.xlsx)',
@@ -329,8 +384,8 @@ class _PosScreenState extends State<PosScreen> {
                 return GridView.builder(
                   padding: const EdgeInsets.all(16),
                   gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 220,
-                    childAspectRatio: 0.88,
+                    maxCrossAxisExtent: 210,
+                    childAspectRatio: 0.78,
                     crossAxisSpacing: 12,
                     mainAxisSpacing: 12,
                   ),

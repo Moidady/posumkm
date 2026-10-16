@@ -81,9 +81,24 @@ class ShiftLocalDataSourceImpl implements ShiftLocalDataSource {
           ? settingsList.first['store_name'] as String
           : 'Kedai Pos UMKM';
 
-      // 4. Catat riwayat shift ke SQLite
+      // 4. Agregasi mutasi kas kecil (cash_movements) hari ini
+      final movementsAgg = await db.rawQuery('''
+        SELECT 
+          COALESCE(SUM(CASE WHEN type = 'IN' THEN amount ELSE 0 END), 0) as total_in,
+          COALESCE(SUM(CASE WHEN type = 'OUT' THEN amount ELSE 0 END), 0) as total_out
+        FROM cash_movements
+        WHERE created_at >= ?
+      ''', [startOfDay]);
+
+      final dbCashIn = (movementsAgg.first['total_in'] as num?)?.toInt() ?? 0;
+      final dbCashOut = (movementsAgg.first['total_out'] as num?)?.toInt() ?? 0;
+
+      final finalCashIn = cashIn + dbCashIn;
+      final finalCashOut = cashOut + dbCashOut;
+
+      // 5. Catat riwayat shift ke SQLite
       final shiftId = _uuid.v4();
-      final systemCash = startingCash + cashSales + cashIn - cashOut;
+      final systemCash = startingCash + cashSales + finalCashIn - finalCashOut;
 
       await db.insert('shifts', {
         'id': shiftId,
@@ -93,8 +108,8 @@ class ShiftLocalDataSourceImpl implements ShiftLocalDataSource {
         'starting_cash': startingCash,
         'actual_cash': actualCash,
         'system_cash': systemCash,
-        'cash_in': cashIn,
-        'cash_out': cashOut,
+        'cash_in': finalCashIn,
+        'cash_out': finalCashOut,
         'status': 'CLOSED',
       });
 
@@ -107,8 +122,8 @@ class ShiftLocalDataSourceImpl implements ShiftLocalDataSource {
         cashSales: cashSales,
         qrisSales: qrisSales,
         startingCash: startingCash,
-        cashIn: cashIn,
-        cashOut: cashOut,
+        cashIn: finalCashIn,
+        cashOut: finalCashOut,
         actualCash: actualCash,
         topProducts: topProducts,
       );

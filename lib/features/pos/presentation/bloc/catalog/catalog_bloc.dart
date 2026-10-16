@@ -10,6 +10,10 @@ class CatalogBloc extends Bloc<CatalogEvent, CatalogState> {
     on<LoadCatalogEvent>(_onLoadCatalog);
     on<SelectCategoryEvent>(_onSelectCategory);
     on<SearchProductEvent>(_onSearchProduct);
+    on<SaveProductEvent>(_onSaveProduct);
+    on<ToggleProductAvailabilityEvent>(_onToggleAvailability);
+    on<DeleteProductEvent>(_onDeleteProduct);
+    on<AddCategoryEvent>(_onAddCategory);
   }
 
   Future<void> _onLoadCatalog(
@@ -20,9 +24,11 @@ class CatalogBloc extends Bloc<CatalogEvent, CatalogState> {
     try {
       final categories = await getCatalogUseCase.getCategories();
       final products = await getCatalogUseCase.getProducts();
+      final allProducts = await getCatalogUseCase.getProducts(includeUnavailable: true);
       emit(CatalogLoaded(
         categories: categories,
         products: products,
+        allProducts: allProducts,
         selectedCategoryId: 'all',
       ));
     } catch (e) {
@@ -36,7 +42,6 @@ class CatalogBloc extends Bloc<CatalogEvent, CatalogState> {
   ) async {
     final currentState = state;
     if (currentState is CatalogLoaded) {
-      emit(const CatalogLoading());
       try {
         final products = await getCatalogUseCase.getProducts(
           categoryId: event.categoryId == 'all' ? null : event.categoryId,
@@ -73,5 +78,77 @@ class CatalogBloc extends Bloc<CatalogEvent, CatalogState> {
         emit(CatalogError(e.toString()));
       }
     }
+  }
+
+  Future<void> _onSaveProduct(
+    SaveProductEvent event,
+    Emitter<CatalogState> emit,
+  ) async {
+    try {
+      await getCatalogUseCase.saveProduct(event.product);
+      await _reloadCurrentCatalog(emit);
+    } catch (e) {
+      emit(CatalogError(e.toString()));
+    }
+  }
+
+  Future<void> _onToggleAvailability(
+    ToggleProductAvailabilityEvent event,
+    Emitter<CatalogState> emit,
+  ) async {
+    try {
+      await getCatalogUseCase.toggleProductAvailability(
+        event.productId,
+        event.isAvailable,
+      );
+      await _reloadCurrentCatalog(emit);
+    } catch (e) {
+      emit(CatalogError(e.toString()));
+    }
+  }
+
+  Future<void> _onDeleteProduct(
+    DeleteProductEvent event,
+    Emitter<CatalogState> emit,
+  ) async {
+    try {
+      await getCatalogUseCase.deleteProduct(event.productId);
+      await _reloadCurrentCatalog(emit);
+    } catch (e) {
+      emit(CatalogError(e.toString()));
+    }
+  }
+
+  Future<void> _onAddCategory(
+    AddCategoryEvent event,
+    Emitter<CatalogState> emit,
+  ) async {
+    try {
+      await getCatalogUseCase.addCategory(name: event.categoryName);
+      await _reloadCurrentCatalog(emit);
+    } catch (e) {
+      emit(CatalogError(e.toString()));
+    }
+  }
+
+  Future<void> _reloadCurrentCatalog(Emitter<CatalogState> emit) async {
+    final currentState = state;
+    final selectedCat = currentState is CatalogLoaded ? currentState.selectedCategoryId : 'all';
+    final query = currentState is CatalogLoaded ? currentState.searchQuery : '';
+
+    final categories = await getCatalogUseCase.getCategories();
+    final products = await getCatalogUseCase.getProducts(
+      categoryId: selectedCat == 'all' ? null : selectedCat,
+      searchQuery: query.isEmpty ? null : query,
+    );
+    final allProducts = await getCatalogUseCase.getProducts(includeUnavailable: true);
+
+    emit(CatalogLoaded(
+      categories: categories,
+      products: products,
+      allProducts: allProducts,
+      selectedCategoryId: selectedCat,
+      searchQuery: query,
+    ));
   }
 }

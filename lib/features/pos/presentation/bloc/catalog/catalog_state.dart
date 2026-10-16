@@ -20,12 +20,14 @@ class CatalogLoading extends CatalogState {
 class CatalogLoaded extends CatalogState {
   final List<Category> categories;
   final List<Product> products;
+  final List<Product> allProducts; // Termasuk menu yang sedang habis untuk layar Kelola Menu
   final String selectedCategoryId; // 'all' untuk semua produk
   final String searchQuery;
 
   const CatalogLoaded({
     required this.categories,
     required this.products,
+    this.allProducts = const [],
     this.selectedCategoryId = 'all',
     this.searchQuery = '',
   });
@@ -33,19 +35,27 @@ class CatalogLoaded extends CatalogState {
   CatalogLoaded copyWith({
     List<Category>? categories,
     List<Product>? products,
+    List<Product>? allProducts,
     String? selectedCategoryId,
     String? searchQuery,
   }) {
     return CatalogLoaded(
       categories: categories ?? this.categories,
       products: products ?? this.products,
+      allProducts: allProducts ?? this.allProducts,
       selectedCategoryId: selectedCategoryId ?? this.selectedCategoryId,
       searchQuery: searchQuery ?? this.searchQuery,
     );
   }
 
   @override
-  List<Object?> get props => [categories, products, selectedCategoryId, searchQuery];
+  List<Object?> get props => [
+        categories,
+        products,
+        allProducts,
+        selectedCategoryId,
+        searchQuery,
+      ];
 }
 
 class CatalogError extends CatalogState {
