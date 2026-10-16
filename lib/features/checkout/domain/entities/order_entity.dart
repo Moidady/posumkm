@@ -16,6 +16,8 @@ class OrderEntity extends Equatable {
   final String? qrisScannedTimestamp;
   final String? qrisProofImagePath;
   final String status; // 'PAID' atau 'VOID'
+  final String cashierName;
+  final String deviceName;
   final DateTime createdAt;
   final String hlcTimestamp;
   final List<OrderItemEntity> items;
@@ -35,6 +37,8 @@ class OrderEntity extends Equatable {
     this.qrisScannedTimestamp,
     this.qrisProofImagePath,
     this.status = 'PAID',
+    this.cashierName = 'Kasir 1',
+    this.deviceName = 'HP-KASIR-1',
     required this.createdAt,
     required this.hlcTimestamp,
     this.items = const [],
@@ -56,6 +60,8 @@ class OrderEntity extends Equatable {
         qrisScannedTimestamp,
         qrisProofImagePath,
         status,
+        cashierName,
+        deviceName,
         createdAt,
         hlcTimestamp,
         items,

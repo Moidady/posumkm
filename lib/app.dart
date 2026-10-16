@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pos_umkm/core/theme/app_theme.dart';
+import 'package:pos_umkm/features/auth/presentation/bloc/auth_cubit.dart';
+import 'package:pos_umkm/features/auth/presentation/screens/login_screen.dart';
 import 'package:pos_umkm/features/checkout/data/repositories/order_repository_impl.dart';
 import 'package:pos_umkm/features/checkout/domain/usecases/process_checkout_usecase.dart';
 import 'package:pos_umkm/features/checkout/presentation/bloc/checkout_bloc.dart';
@@ -24,6 +26,9 @@ class PosUmkmApp extends StatelessWidget {
 
     return MultiBlocProvider(
       providers: [
+        BlocProvider<AuthCubit>(
+          create: (_) => AuthCubit()..loadUsers(),
+        ),
         BlocProvider<CatalogBloc>(
           create: (_) => CatalogBloc(
             getCatalogUseCase: GetCatalogUseCase(catalogRepository),
@@ -48,7 +53,14 @@ class PosUmkmApp extends StatelessWidget {
         title: 'POS UMKM',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
-        home: const PosScreen(),
+        home: BlocBuilder<AuthCubit, AuthState>(
+          builder: (context, authState) {
+            if (!authState.isAuthenticated) {
+              return const LoginScreen();
+            }
+            return const PosScreen();
+          },
+        ),
       ),
     );
   }

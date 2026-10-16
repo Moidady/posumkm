@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pos_umkm/core/theme/app_colors.dart';
 import 'package:pos_umkm/core/utils/currency_formatter.dart';
+import 'package:pos_umkm/features/auth/presentation/bloc/auth_cubit.dart';
 import 'package:pos_umkm/features/shift/data/datasources/local/shift_local_datasource.dart';
 import 'package:pos_umkm/features/shift/data/services/whatsapp_closing_report_service.dart';
 import 'package:pos_umkm/features/shift/domain/entities/daily_closing_summary.dart';
@@ -27,6 +29,11 @@ class _CloseShiftDialogState extends State<CloseShiftDialog> {
   @override
   void initState() {
     super.initState();
+    final authState = context.read<AuthCubit>().state;
+    if (authState.currentUser != null) {
+      _cashierNameController.text =
+          '${authState.currentUser!.fullName} (${authState.activeDeviceName})';
+    }
     _loadOwnerPhone();
   }
 

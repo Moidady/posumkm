@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pos_umkm/core/theme/app_colors.dart';
 import 'package:pos_umkm/core/utils/currency_formatter.dart';
+import 'package:pos_umkm/features/auth/presentation/bloc/auth_cubit.dart';
 import 'package:pos_umkm/features/checkout/domain/usecases/verify_qris_proof_usecase.dart';
 import 'package:pos_umkm/features/checkout/presentation/bloc/checkout_bloc.dart';
 import 'package:pos_umkm/features/pos/domain/entities/cart_item.dart';
@@ -295,6 +296,8 @@ class _CheckoutDialogState extends State<CheckoutDialog>
                             child: ElevatedButton(
                               onPressed: isCashSufficient
                                   ? () {
+                                      final authState =
+                                          context.read<AuthCubit>().state;
                                       context.read<CheckoutBloc>().add(
                                             ProcessCashPaymentEvent(
                                               cartItems: widget.cartItems,
@@ -303,6 +306,11 @@ class _CheckoutDialogState extends State<CheckoutDialog>
                                                   widget.discountAmount,
                                               totalAmount: widget.totalAmount,
                                               cashTendered: _cashTendered,
+                                              cashierName: authState
+                                                      .currentUser?.fullName ??
+                                                  'Kasir 1',
+                                              deviceName:
+                                                  authState.activeDeviceName,
                                             ),
                                           );
                                       Navigator.pop(context);
@@ -499,6 +507,8 @@ class _CheckoutDialogState extends State<CheckoutDialog>
                                     ? 'RRN-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}'
                                     : 'RRN-${_qrisRefController.text.trim()}';
 
+                                final authState =
+                                    context.read<AuthCubit>().state;
                                 context.read<CheckoutBloc>().add(
                                       ProcessQrisPaymentEvent(
                                         cartItems: widget.cartItems,
@@ -508,6 +518,10 @@ class _CheckoutDialogState extends State<CheckoutDialog>
                                         qrisReferenceNo: ref,
                                         qrisScannedTimestamp:
                                             DateTime.now().toIso8601String(),
+                                        cashierName:
+                                            authState.currentUser?.fullName ??
+                                                'Kasir 1',
+                                        deviceName: authState.activeDeviceName,
                                       ),
                                     );
                                 Navigator.pop(context);

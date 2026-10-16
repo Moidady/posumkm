@@ -23,6 +23,8 @@ class OrderRepositoryImpl implements OrderRepository {
     String? qrisScannedTimestamp,
     String? qrisProofImagePath,
     String? shiftId,
+    String cashierName = 'Kasir 1',
+    String deviceName = 'HP-KASIR-1',
   }) {
     return localDataSource.createOrder(
       cartItems: cartItems,
@@ -36,6 +38,8 @@ class OrderRepositoryImpl implements OrderRepository {
       qrisScannedTimestamp: qrisScannedTimestamp,
       qrisProofImagePath: qrisProofImagePath,
       shiftId: shiftId,
+      cashierName: cashierName,
+      deviceName: deviceName,
     );
   }
 

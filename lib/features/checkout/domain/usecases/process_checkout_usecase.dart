@@ -19,6 +19,8 @@ class ProcessCheckoutUseCase {
     String? qrisScannedTimestamp,
     String? qrisProofImagePath,
     String? shiftId,
+    String cashierName = 'Kasir 1',
+    String deviceName = 'HP-KASIR-1',
   }) {
     return repository.processCheckout(
       cartItems: cartItems,
@@ -32,6 +34,8 @@ class ProcessCheckoutUseCase {
       qrisScannedTimestamp: qrisScannedTimestamp,
       qrisProofImagePath: qrisProofImagePath,
       shiftId: shiftId,
+      cashierName: cashierName,
+      deviceName: deviceName,
     );
   }
 }

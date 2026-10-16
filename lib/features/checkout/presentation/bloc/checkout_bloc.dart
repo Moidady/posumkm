@@ -18,6 +18,8 @@ class ProcessCashPaymentEvent extends CheckoutEvent {
   final int discountAmount;
   final int totalAmount;
   final int cashTendered;
+  final String cashierName;
+  final String deviceName;
 
   const ProcessCashPaymentEvent({
     required this.cartItems,
@@ -25,6 +27,8 @@ class ProcessCashPaymentEvent extends CheckoutEvent {
     required this.discountAmount,
     required this.totalAmount,
     required this.cashTendered,
+    this.cashierName = 'Kasir 1',
+    this.deviceName = 'HP-KASIR-1',
   });
 
   @override
@@ -34,6 +38,8 @@ class ProcessCashPaymentEvent extends CheckoutEvent {
         discountAmount,
         totalAmount,
         cashTendered,
+        cashierName,
+        deviceName,
       ];
 }
 
@@ -45,6 +51,8 @@ class ProcessQrisPaymentEvent extends CheckoutEvent {
   final String? qrisReferenceNo;
   final String? qrisScannedTimestamp;
   final String? qrisProofImagePath;
+  final String cashierName;
+  final String deviceName;
 
   const ProcessQrisPaymentEvent({
     required this.cartItems,
@@ -54,6 +62,8 @@ class ProcessQrisPaymentEvent extends CheckoutEvent {
     this.qrisReferenceNo,
     this.qrisScannedTimestamp,
     this.qrisProofImagePath,
+    this.cashierName = 'Kasir 1',
+    this.deviceName = 'HP-KASIR-1',
   });
 
   @override
@@ -65,6 +75,8 @@ class ProcessQrisPaymentEvent extends CheckoutEvent {
         qrisReferenceNo,
         qrisScannedTimestamp,
         qrisProofImagePath,
+        cashierName,
+        deviceName,
       ];
 }
 
@@ -137,6 +149,8 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
         paymentMethod: 'CASH',
         cashTendered: event.cashTendered,
         changeDue: changeDue,
+        cashierName: event.cashierName,
+        deviceName: event.deviceName,
       );
       emit(CheckoutSuccess(receipt));
     } catch (e) {
@@ -162,6 +176,8 @@ class CheckoutBloc extends Bloc<CheckoutEvent, CheckoutState> {
         qrisReferenceNo: event.qrisReferenceNo,
         qrisScannedTimestamp: event.qrisScannedTimestamp,
         qrisProofImagePath: event.qrisProofImagePath,
+        cashierName: event.cashierName,
+        deviceName: event.deviceName,
       );
       emit(CheckoutSuccess(receipt));
     } catch (e) {

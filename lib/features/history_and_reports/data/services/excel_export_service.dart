@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:excel/excel.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pos_umkm/core/database/app_database.dart';
@@ -14,8 +15,12 @@ class ExcelExportService {
   ExcelExportService({AppDatabase? database})
       : appDatabase = database ?? AppDatabase.instance;
 
-  /// Menghasilkan file spreadsheet .xlsx dengan 3 sheet lengkap dan membagikannya
+  /// Menghasilkan file spreadsheet .xlsx dengan 3 sheet lengkap dan mengunduh/membagikannya
   Future<String> exportMonthlyReport({DateTime? targetMonth}) async {
+    try {
+      await initializeDateFormatting('id_ID', null);
+    } catch (_) {}
+
     final db = await appDatabase.database;
     final now = targetMonth ?? DateTime.now();
 
@@ -31,7 +36,7 @@ class ExcelExportService {
       ORDER BY created_at ASC
     ''', [startOfMonth, endOfMonth]);
 
-    // Ambil data performa menu
+    // Ambil data performa menu (LEFT JOIN agar transaksi historis tetap tercatat)
     final itemMaps = await db.rawQuery('''
       SELECT 
         oi.product_name,
@@ -40,8 +45,8 @@ class ExcelExportService {
         SUM(oi.subtotal) as total_sales
       FROM order_items oi
       JOIN orders o ON oi.order_id = o.id
-      JOIN products p ON oi.product_id = p.id
-      JOIN categories c ON p.category_id = c.id
+      LEFT JOIN products p ON oi.product_id = p.id
+      LEFT JOIN categories c ON p.category_id = c.id
       WHERE o.created_at >= ? AND o.created_at < ? AND o.status = 'PAID'
       GROUP BY oi.product_name
       ORDER BY total_qty DESC
@@ -49,7 +54,9 @@ class ExcelExportService {
 
     // Buat Workbook Excel
     final excel = Excel.createExcel();
-    excel.delete('Sheet1'); // Hapus sheet default
+    if (excel.sheets.containsKey('Sheet1')) {
+      excel.rename('Sheet1', 'Ringkasan Harian');
+    }
 
     // ==========================================
     // SHEET 1: RINGKASAN HARIAN
@@ -111,7 +118,15 @@ class ExcelExportService {
     // SHEET 2: LOG TRANSAKSI LENGKAP
     // ==========================================
     final sheet2 = excel['Log Transaksi Lengkap'];
-    final headers2 = ['No. Order', 'Waktu Transaksi', 'Metode Bayar', 'Total Tagihan (Rp)', 'No. Ref QRIS / Tunai'];
+    final headers2 = [
+      'No. Order',
+      'Waktu Transaksi',
+      'Kasir',
+      'Perangkat / HP',
+      'Metode Bayar',
+      'Total Tagihan (Rp)',
+      'No. Ref QRIS / Tunai',
+    ];
     sheet2.appendRow(headers2.map((h) => TextCellValue(h)).toList());
 
     for (final o in orderMaps) {
@@ -123,6 +138,8 @@ class ExcelExportService {
       sheet2.appendRow([
         TextCellValue(o['order_number'] as String),
         TextCellValue(DateFormatter.formatDateTime(dt)),
+        TextCellValue(o['cashier_name'] as String? ?? 'Kasir 1'),
+        TextCellValue(o['device_name'] as String? ?? 'HP-KASIR-1'),
         TextCellValue(o['payment_method'] as String),
         IntCellValue(o['total_amount'] as int),
         TextCellValue(ref),
@@ -145,33 +162,32 @@ class ExcelExportService {
       ]);
     }
 
-    // Simpan & bagikan file spreadsheet
-    final bytes = excel.encode();
-    if (bytes == null) throw Exception('Gagal meng-encode file Excel.');
-
     final fileName = 'Laporan_PosUmkm_${DateFormat('yyyy_MM').format(now)}.xlsx';
+    final monthYearLabel = DateFormatter.formatMonthYear(now);
 
     if (kIsWeb) {
-      await Share.shareXFiles(
-        [
-          XFile.fromData(
-            Uint8List.fromList(bytes),
-            name: fileName,
-            mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          ),
-        ],
-        text: '📊 Laporan Penjualan Bulan ${DateFormat('MMMM yyyy', 'id_ID').format(now)}',
-      );
+      // Di Web (Chrome/Edge), excel.save(fileName: ...) otomatis mengunduh file .xlsx langsung ke folder Downloads browser
+      final savedBytes = excel.save(fileName: fileName);
+      if (savedBytes == null) {
+        throw Exception('Gagal meng-encode file Excel.');
+      }
       return fileName;
     } else {
+      final bytes = excel.encode();
+      if (bytes == null) throw Exception('Gagal meng-encode file Excel.');
+
       final tempDir = await getApplicationDocumentsDirectory();
       final file = File('${tempDir.path}/$fileName');
       await file.writeAsBytes(bytes, flush: true);
 
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        text: '📊 Laporan Penjualan Bulan ${DateFormat('MMMM yyyy', 'id_ID').format(now)}',
-      );
+      try {
+        await Share.shareXFiles(
+          [XFile(file.path)],
+          text: '📊 Laporan Penjualan Bulan $monthYearLabel',
+        );
+      } catch (_) {
+        // Jika Share sheet tidak tersedia di OS desktop, file tetap tersimpan di Documents
+      }
       return file.path;
     }
   }

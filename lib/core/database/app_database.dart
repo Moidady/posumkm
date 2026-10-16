@@ -28,7 +28,7 @@ class AppDatabase {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
       onConfigure: _onConfigure,
@@ -51,6 +51,9 @@ class AppDatabase {
     if (oldVersion < 2) {
       await _replaceWithOfficialCatalog(db);
     }
+    if (oldVersion < 3) {
+      await _ensureMultiDeviceSchema(db);
+    }
   }
 
   Future<void> _onOpen(Database db) async {
@@ -59,7 +62,7 @@ class AppDatabase {
         "SELECT name FROM sqlite_master WHERE type='table' AND name='categories'",
       );
       if (tables.isEmpty) {
-        await _createDB(db, 2);
+        await _createDB(db, 3);
       } else {
         // Cek apakah masih menggunakan kategori lama ('cat-1') atau belum ada 'cat-lumpia'
         final lumpiaCat = await db.query(
@@ -70,9 +73,100 @@ class AppDatabase {
         if (lumpiaCat.isEmpty) {
           await _replaceWithOfficialCatalog(db);
         }
+        await _ensureMultiDeviceSchema(db);
       }
     } catch (e) {
       debugPrint('Database auto-repair notice: $e');
+    }
+  }
+
+  Future<void> _ensureMultiDeviceSchema(Database db) async {
+    // 1. Pastikan tabel users untuk login multi-HP kasir tersedia
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        username TEXT NOT NULL UNIQUE,
+        full_name TEXT NOT NULL,
+        pin_code TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'CASHIER',
+        assigned_device TEXT NOT NULL DEFAULT 'HP-KASIR-1',
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at INTEGER NOT NULL
+      )
+    ''');
+
+    // 2. Pastikan kolom cashier_name dan device_name ada pada tabel orders
+    final orderCols = await db.rawQuery('PRAGMA table_info(orders)');
+    final colNames = orderCols.map((c) => c['name'] as String).toSet();
+    if (!colNames.contains('cashier_name')) {
+      await db.execute(
+        "ALTER TABLE orders ADD COLUMN cashier_name TEXT NOT NULL DEFAULT 'Kasir 1'",
+      );
+    }
+    if (!colNames.contains('device_name')) {
+      await db.execute(
+        "ALTER TABLE orders ADD COLUMN device_name TEXT NOT NULL DEFAULT 'HP-KASIR-1'",
+      );
+    }
+
+    // 3. Seed akun default jika tabel users masih kosong
+    await _seedDefaultUsers(db);
+  }
+
+  Future<void> _seedDefaultUsers(Database db) async {
+    final existing = await db.query('users', limit: 1);
+    if (existing.isNotEmpty) return;
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final defaultUsers = [
+      {
+        'id': 'user-owner',
+        'username': 'owner',
+        'full_name': 'Owner / Admin Utama',
+        'pin_code': '123456',
+        'role': 'OWNER',
+        'assigned_device': 'HP-OWNER',
+        'is_active': 1,
+        'created_at': now,
+      },
+      {
+        'id': 'user-kasir-1',
+        'username': 'kasir1',
+        'full_name': 'Kasir 1 (HP Utama)',
+        'pin_code': '111111',
+        'role': 'CASHIER',
+        'assigned_device': 'HP-KASIR-1',
+        'is_active': 1,
+        'created_at': now,
+      },
+      {
+        'id': 'user-kasir-2',
+        'username': 'kasir2',
+        'full_name': 'Kasir 2 (HP Kedua)',
+        'pin_code': '222222',
+        'role': 'CASHIER',
+        'assigned_device': 'HP-KASIR-2',
+        'is_active': 1,
+        'created_at': now,
+      },
+      {
+        'id': 'user-kasir-3',
+        'username': 'kasir3',
+        'full_name': 'Kasir 3 (Tablet / Booth)',
+        'pin_code': '333333',
+        'role': 'CASHIER',
+        'assigned_device': 'TABLET-KASIR-3',
+        'is_active': 1,
+        'created_at': now,
+      },
+    ];
+
+    for (final u in defaultUsers) {
+      await db.insert(
+        'users',
+        u,
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
     }
   }
 
@@ -183,6 +277,8 @@ class AppDatabase {
         qris_scanned_timestamp TEXT,
         qris_proof_image_path TEXT,
         status TEXT NOT NULL DEFAULT 'PAID',
+        cashier_name TEXT NOT NULL DEFAULT 'Kasir 1',
+        device_name TEXT NOT NULL DEFAULT 'HP-KASIR-1',
         created_at INTEGER NOT NULL,
         hlc_timestamp TEXT NOT NULL,
         FOREIGN KEY (shift_id) REFERENCES shifts (id)
@@ -218,7 +314,21 @@ class AppDatabase {
       )
     ''');
 
-    // Inisialisasi Data Awal Menu UMKM & Pengaturan Toko
+    // 10. Tabel Akun Kasir & Perangkat Multi-HP
+    await db.execute('''
+      CREATE TABLE users (
+        id TEXT PRIMARY KEY,
+        username TEXT NOT NULL UNIQUE,
+        full_name TEXT NOT NULL,
+        pin_code TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'CASHIER',
+        assigned_device TEXT NOT NULL DEFAULT 'HP-KASIR-1',
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at INTEGER NOT NULL
+      )
+    ''');
+
+    // Inisialisasi Data Awal Menu UMKM, Akun Kasir, & Pengaturan Toko
     await _seedInitialData(db);
   }
 
@@ -237,6 +347,7 @@ class AppDatabase {
       conflictAlgorithm: ConflictAlgorithm.ignore,
     );
 
+    await _seedDefaultUsers(db);
     await _seedCatalogData(db);
   }
 

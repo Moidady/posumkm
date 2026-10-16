@@ -15,6 +15,8 @@ abstract class OrderRepository {
     String? qrisScannedTimestamp,
     String? qrisProofImagePath,
     String? shiftId,
+    String cashierName = 'Kasir 1',
+    String deviceName = 'HP-KASIR-1',
   });
 
   Future<List<OrderEntity>> getOrders({int limit = 50});

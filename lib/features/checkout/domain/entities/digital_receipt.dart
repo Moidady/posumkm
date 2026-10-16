@@ -26,6 +26,7 @@ class DigitalReceipt extends Equatable {
     buffer.writeln('WA: $storePhone');
     buffer.writeln('================================');
     buffer.writeln('No. Pesanan : ${order.orderNumber}');
+    buffer.writeln('Kasir / HP  : ${order.cashierName} (${order.deviceName})');
     buffer.writeln('Tanggal     : ${DateFormatter.formatDateTime(order.createdAt)}');
     buffer.writeln('--------------------------------');
 

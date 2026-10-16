@@ -22,6 +22,8 @@ abstract class OrderLocalDataSource {
     String? qrisScannedTimestamp,
     String? qrisProofImagePath,
     String? shiftId,
+    String cashierName = 'Kasir 1',
+    String deviceName = 'HP-KASIR-1',
   });
 
   Future<List<OrderEntity>> getOrders({int limit = 50});
@@ -47,17 +49,25 @@ class OrderLocalDataSourceImpl implements OrderLocalDataSource {
     String? qrisScannedTimestamp,
     String? qrisProofImagePath,
     String? shiftId,
+    String cashierName = 'Kasir 1',
+    String deviceName = 'HP-KASIR-1',
   }) async {
     final db = await appDatabase.database;
     final orderId = _uuid.v4();
     final now = DateTime.now();
     final nowMillis = now.millisecondsSinceEpoch;
 
-    // Format nomor order manusiawi: ORD-20261016-1234
+    // Buat kode singkat dari deviceName agar struk dari HP1 dan HP2 tidak pernah bentrok
+    final cleanDev = deviceName.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
+    final devSuffix = cleanDev.length >= 2
+        ? cleanDev.substring(cleanDev.length - 2)
+        : 'K1';
+
+    // Format nomor order unik per perangkat: ORD-K1-20261016-1234
     final dateStr = DateFormat('yyyyMMdd').format(now);
     final randomDigits = (Random().nextInt(9000) + 1000).toString();
-    final orderNumber = 'ORD-$dateStr-$randomDigits';
-    final hlcTimestamp = '${nowMillis}_0_device';
+    final orderNumber = 'ORD-$devSuffix-$dateStr-$randomDigits';
+    final hlcTimestamp = '${nowMillis}_0_$deviceName';
 
     final orderItemsToInsert = <OrderItemEntity>[];
 
@@ -104,6 +114,8 @@ class OrderLocalDataSourceImpl implements OrderLocalDataSource {
           'qris_scanned_timestamp': qrisScannedTimestamp,
           'qris_proof_image_path': qrisProofImagePath,
           'status': 'PAID',
+          'cashier_name': cashierName,
+          'device_name': deviceName,
           'created_at': nowMillis,
           'hlc_timestamp': hlcTimestamp,
         });
@@ -133,6 +145,8 @@ class OrderLocalDataSourceImpl implements OrderLocalDataSource {
             'order_number': orderNumber,
             'total_amount': totalAmount,
             'payment_method': paymentMethod,
+            'cashier_name': cashierName,
+            'device_name': deviceName,
             'items_count': orderItemsToInsert.length,
           }),
           'hlc_timestamp': hlcTimestamp,
@@ -167,6 +181,8 @@ class OrderLocalDataSourceImpl implements OrderLocalDataSource {
         qrisScannedTimestamp: qrisScannedTimestamp,
         qrisProofImagePath: qrisProofImagePath,
         status: 'PAID',
+        cashierName: cashierName,
+        deviceName: deviceName,
         createdAt: now,
         hlcTimestamp: hlcTimestamp,
         items: orderItemsToInsert,
@@ -232,6 +248,8 @@ class OrderLocalDataSourceImpl implements OrderLocalDataSource {
           qrisScannedTimestamp: oMap['qris_scanned_timestamp'] as String?,
           qrisProofImagePath: oMap['qris_proof_image_path'] as String?,
           status: oMap['status'] as String? ?? 'PAID',
+          cashierName: oMap['cashier_name'] as String? ?? 'Kasir 1',
+          deviceName: oMap['device_name'] as String? ?? 'HP-KASIR-1',
           createdAt: DateTime.fromMillisecondsSinceEpoch(oMap['created_at'] as int),
           hlcTimestamp: oMap['hlc_timestamp'] as String? ?? '',
           items: items,

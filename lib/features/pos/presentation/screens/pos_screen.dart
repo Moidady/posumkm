@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pos_umkm/core/theme/app_colors.dart';
 import 'package:pos_umkm/core/utils/currency_formatter.dart';
+import 'package:pos_umkm/features/auth/presentation/bloc/auth_cubit.dart';
+import 'package:pos_umkm/features/auth/presentation/widgets/multi_device_sync_dialog.dart';
 import 'package:pos_umkm/features/checkout/presentation/bloc/checkout_bloc.dart';
 import 'package:pos_umkm/features/checkout/presentation/widgets/checkout_dialog.dart';
 import 'package:pos_umkm/features/checkout/presentation/widgets/digital_receipt_dialog.dart';
 import 'package:pos_umkm/features/history_and_reports/data/services/excel_export_service.dart';
+import 'package:pos_umkm/features/history_and_reports/presentation/screens/analytics_dashboard_screen.dart';
 import 'package:pos_umkm/features/history_and_reports/presentation/widgets/order_history_dialog.dart';
 import 'package:pos_umkm/features/pos/presentation/bloc/cart/cart_bloc.dart';
 import 'package:pos_umkm/features/pos/presentation/bloc/cart/cart_event.dart';
@@ -72,13 +75,33 @@ class _PosScreenState extends State<PosScreen> {
     );
   }
 
-  Future<void> _openOwnerSettings(BuildContext context) async {
-    final authorized = await OwnerPinDialog.verify(
-      context,
-      title: 'Akses Owner: Kelola Menu & Toko',
-      subtitle: 'Masukkan PIN Owner untuk mengubah harga menu atau pengaturan toko (Default: 123456).',
+  void _openMultiDeviceModal(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (_) => const MultiDeviceSyncDialog(),
     );
-    if (!authorized || !context.mounted) return;
+  }
+
+  void _openAnalyticsScreen(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const AnalyticsDashboardScreen(),
+      ),
+    );
+  }
+
+  Future<void> _openOwnerSettings(BuildContext context) async {
+    final currentUser = context.read<AuthCubit>().state.currentUser;
+    if (currentUser == null || !currentUser.isOwner) {
+      final authorized = await OwnerPinDialog.verify(
+        context,
+        title: 'Akses Owner: Kelola Menu & Toko',
+        subtitle:
+            'Masukkan PIN Owner untuk mengubah harga menu atau pengaturan toko (Default: 123456).',
+      );
+      if (!authorized || !context.mounted) return;
+    }
 
     Navigator.push(
       context,
@@ -90,12 +113,26 @@ class _PosScreenState extends State<PosScreen> {
 
   Future<void> _exportExcel(BuildContext context) async {
     try {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Menyiapkan file Excel 3-Sheet...')),
+        const SnackBar(
+          content: Text('Menyiapkan file Excel 3-Sheet...'),
+          duration: Duration(seconds: 1),
+        ),
       );
-      await ExcelExportService().exportMonthlyReport();
+      final savedFile = await ExcelExportService().exportMonthlyReport();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ File Excel berhasil diunduh: $savedFile'),
+            backgroundColor: AppColors.primary,
+          ),
+        );
+      }
     } catch (e) {
       if (context.mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Gagal ekspor Excel: $e'), backgroundColor: AppColors.error),
         );
@@ -162,6 +199,56 @@ class _PosScreenState extends State<PosScreen> {
             },
           ),
           actions: [
+            // Badge Kasir Aktif & Perangkat HP (Klik untuk Multi-HP Sync / Ganti Kasir)
+            BlocBuilder<AuthCubit, AuthState>(
+              builder: (context, authState) {
+                final userLabel =
+                    authState.currentUser?.username.toUpperCase() ?? 'KASIR';
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: InkWell(
+                    onTap: () => _openMultiDeviceModal(context),
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.info.withAlpha(22),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppColors.info.withAlpha(90)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.devices_rounded,
+                            size: 15,
+                            color: AppColors.info,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            '$userLabel • ${authState.activeDeviceName}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.info,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            // Tombol Dashboard Analitik & Grafik Penjualan
+            IconButton(
+              tooltip: 'Dashboard Analitik & Grafik Penjualan',
+              icon: const Icon(Icons.bar_chart_rounded, color: AppColors.primary),
+              onPressed: () => _openAnalyticsScreen(context),
+            ),
             // Tombol Riwayat Transaksi, Void, & Kas Kecil
             IconButton(
               tooltip: 'Riwayat Transaksi, Void, & Kas Laci',
