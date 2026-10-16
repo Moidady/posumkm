@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
@@ -17,21 +18,51 @@ class AppDatabase {
   }
 
   Future<Database> _initDB(String filePath) async {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, filePath);
+    String path;
+    if (kIsWeb) {
+      path = filePath;
+    } else {
+      final dbPath = await getDatabasesPath();
+      path = join(dbPath, filePath);
+    }
 
     return await openDatabase(
       path,
       version: 1,
       onCreate: _createDB,
       onConfigure: _onConfigure,
+      onOpen: _onOpen,
     );
   }
 
   Future<void> _onConfigure(Database db) async {
-    // Aktifkan foreign key support dan Write-Ahead Logging (WAL) untuk latensi sub-1ms
     await db.execute('PRAGMA foreign_keys = ON');
-    await db.execute('PRAGMA journal_mode = WAL');
+    if (!kIsWeb) {
+      try {
+        await db.execute('PRAGMA journal_mode = WAL');
+      } catch (_) {
+        // WAL mode fallback
+      }
+    }
+  }
+
+  Future<void> _onOpen(Database db) async {
+    try {
+      final tables = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='categories'",
+      );
+      if (tables.isEmpty) {
+        await _createDB(db, 1);
+      } else {
+        final countResult = await db.rawQuery('SELECT count(*) as count FROM categories');
+        final count = Sqflite.firstIntValue(countResult) ?? 0;
+        if (count == 0) {
+          await _seedInitialData(db);
+        }
+      }
+    } catch (e) {
+      debugPrint('Database auto-repair notice: $e');
+    }
   }
 
   Future<void> _createDB(Database db, int version) async {

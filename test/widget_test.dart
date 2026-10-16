@@ -1,30 +1,43 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:pos_umkm/main.dart';
+import 'package:pos_umkm/core/utils/currency_formatter.dart';
+import 'package:pos_umkm/features/pos/domain/entities/cart_item.dart';
+import 'package:pos_umkm/features/pos/domain/entities/product.dart';
+import 'package:pos_umkm/features/pos/domain/entities/product_modifier.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  group('PosUmkm Unit Tests', () {
+    test('CurrencyFormatter memformat angka integer ke format Rupiah standar', () {
+      expect(CurrencyFormatter.format(15000), 'Rp 15.000');
+      expect(CurrencyFormatter.format(1450000), 'Rp 1.450.000');
+      expect(CurrencyFormatter.parse('Rp 38.500'), 38500);
+    });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    test('CartItem menghitung unitPrice dan subtotal dengan modifiers dengan benar', () {
+      const product = Product(
+        id: 'prod-1',
+        categoryId: 'cat-1',
+        name: 'Mojito Series',
+        basePrice: 18000,
+        sku: 'MJT-01',
+      );
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+      const modifier = ProductModifier(
+        id: 'mod-1',
+        productId: 'prod-1',
+        name: 'Extra Boba',
+        extraPrice: 3000,
+        groupName: 'Topping',
+      );
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+      const cartItem = CartItem(
+        id: 'item-1',
+        product: product,
+        quantity: 2,
+        selectedModifiers: [modifier],
+      );
+
+      expect(cartItem.unitPrice, 21000); // 18000 + 3000
+      expect(cartItem.subtotal, 42000); // 21000 * 2
+    });
   });
 }
